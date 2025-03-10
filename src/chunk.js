@@ -49,14 +49,14 @@ utils.extend(Chunk.prototype, {
 
   getParams: function () {
     return {
-      chunkNumber: this.offset + 1,
+      chunk: this.offset,
       chunkSize: this.chunkSize,
       currentChunkSize: this.endByte - this.startByte,
       totalSize: this.file.size,
       identifier: this.file.uniqueIdentifier,
       filename: this.file.name,
       relativePath: this.file.relativePath,
-      totalChunks: this.file.chunks.length
+      chunks: this.file.chunks.length
     }
   },
 

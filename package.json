@@ -1,11 +1,10 @@
 {
   "name": "simple-uploader-x.js",
-  "version": "0.6.1",
+  "version": "0.6.4",
   "author": "DamnCrab <enormouscrab@gmail.com>",
   "license": "MIT",
   "description": "Uploader library implements html5 file upload and provides multiple simultaneous, stable, fault tolerant and resumable uploads",
-  "keywords": [
-  ],
+  "keywords": [],
   "main": "dist/uploader.js",
   "repository": {
     "type": "git",

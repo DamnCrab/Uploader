@@ -1,8 +1,8 @@
 /*!
  * Uploader - Uploader library implements html5 file upload and provides multiple simultaneous, stable, fault tolerant and resumable uploads
- * @version v0.6.0
- * @author dolymood <dolymood@gmail.com>
- * @link https://github.com/simple-uploader/Uploader
+ * @version v0.6.4
+ * @author DamnCrab <enormouscrab@gmail.com>
+ * @link undefined
  * @license MIT
  */
 (function (global, factory) {
@@ -270,14 +270,14 @@
     },
     getParams: function getParams() {
       return {
-        chunkNumber: this.offset + 1,
+        chunk: this.offset,
         chunkSize: this.chunkSize,
         currentChunkSize: this.endByte - this.startByte,
         totalSize: this.file.size,
         identifier: this.file.uniqueIdentifier,
         filename: this.file.name,
         relativePath: this.file.relativePath,
-        totalChunks: this.file.chunks.length
+        chunks: this.file.chunks.length
       };
     },
     getTarget: function getTarget(target, params) {
@@ -1022,7 +1022,7 @@
   var event = event_1;
   var File = file;
   var Chunk = chunk;
-  var version = '0.6.0';
+  var version = '0.6.4';
   var isServer = typeof window === 'undefined';
 
   // ie10+
