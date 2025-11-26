@@ -1,267 +1,220 @@
-# simple-uploader.js [![Build Status](https://travis-ci.org/simple-uploader/Uploader.svg?branch=master)](https://travis-ci.org/simple-uploader/Uploader?branch=master) [![codecov.io](http://codecov.io/github/simple-uploader/Uploader/coverage.svg?branch=master)](http://codecov.io/github/simple-uploader/Uploader?branch=master) [![Build Status](https://saucelabs.com/buildstatus/uploader)](https://saucelabs.com/u/uploader)
+# simple-uploader-x.js 
 
-[![Sauce Test Status](https://saucelabs.com/browser-matrix/uploader.svg)](https://saucelabs.com/u/uploader)
+simple-uploader.js（也称 Uploader) 是一个上传库，支持多并发上传，文件夹、拖拽、可暂停继续、秒传、分块上传、出错自动重传、手工重传、进度、剩余时间、上传速度等特性；该上传库依赖 HTML5 File API。
 
-[中文](./README_zh-CN.md)
+Fork [flow.js](https://github.com/flowjs/flow.js)，但是进行了重构。
 
-![QQ](https://github.com/simple-uploader/Uploader/blob/develop/assets/simple-uploader-QQ-3.png?raw=true)
 
-A JavaScript library providing multiple simultaneous, stable, fault-tolerant and resumable/restartable file uploads via the HTML5 File API.
+## 使用
 
-Forked [flow.js](https://github.com/flowjs/flow.js) but refactor it.
-
-The library is designed to introduce fault-tolerance into the upload of large files through HTTP. This is done by splitting each file into small chunks. Then, whenever the upload of a chunk fails, uploading is retried until the procedure completes. This allows uploads to automatically resume uploading after a network connection is lost either locally or to the server. Additionally, it allows for users to pause, resume and even recover uploads without losing state because only the currently uploading chunks will be aborted, not the entire upload.
-
-Uploader (simple-uploader.js) does not have any external dependencies other than the `HTML5 File API`. This is relied on for the ability to chunk files into smaller pieces. Currently, this means that support is limited to Firefox 4+, Chrome 11+, Safari 6+ and Internet Explorer 10+.
-
-Samples and examples are available in the `samples/` folder. Please push your own as Markdown to help document the project.
-
-## New Features
-
-* Treat `Folder` and `File` as `Uploader.File`
-
-* Treat `Uploader` as a root `Folder`
-
-* New `fileList` property which contains files and folders
-
-## How can I install it?
-
-Download a latest build from https://github.com/simple-uploader/Uploader/releases/
-it contains development and minified production files in `dist/` folder.
-
-or use npm:
-
-```console
-npm install simple-uploader.js
-```
-
-or use git clone
-
-```console
-git clone https://github.com/simple-uploader/Uploader
-```
-
-## How can I use it?
-
-A new `Uploader` object is created with information of what and where to post:
+创建一个  `Uploader` 实例：
 
 ```javascript
 var uploader = new Uploader({
   target: '/api/photo/redeem-upload-token', 
   query: { upload_token: 'my_token' }
 })
-// Uploader isn't supported, fall back on a different method
+// 如果不支持 需要降级的地方
 if (!uploader.support) location.href = '/some-old-crappy-uploader'
 ```
 
-To allow files to be either selected and drag-dropped, you'll assign drop target and a DOM item to be clicked for browsing:
+如果想要选择文件或者拖拽文件的话，你可以通过如下两个 API 来指定哪些 DOM 节点：
 
 ```javascript
 uploader.assignBrowse(document.getElementById('browseButton'))
 uploader.assignDrop(document.getElementById('dropTarget'))
 ```
 
-After this, interaction with Uploader.js is done by listening to events:
+实例化后你还可以选择监听一些事件：
 
 ```javascript
+// 文件添加 单个文件
 uploader.on('fileAdded', function (file, event) {
   console.log(file, event)
 })
+// 单个文件上传成功
 uploader.on('fileSuccess', function (rootFile, file, message) {
   console.log(rootFile, file, message)
 })
+// 根下的单个文件（文件夹）上传完成
 uploader.on('fileComplete', function (rootFile) {
   console.log(rootFile)
 })
+// 某个文件上传失败了
 uploader.on('fileError', function (rootFile, file, message) {
   console.log(rootFile, file, message)
 })
 ```
 
-## How do I set it up with my server?
+## 服务端如何接受呢？
 
-Most of the magic for Uploader.js happens in the user's browser, but files still need to be reassembled from chunks on the server side. This should be a fairly simple task and can be achieved in any web framework or language, which is able to receive file uploads.
+因为在前端做了一些分块啊等处理，所以也需要服务端做一些特殊处理，这个可以参考 `samples/Node.js/` 实现。
 
-To handle the state of upload chunks, a number of extra parameters are sent along with all requests:
+每一个上传块都会包含如下分块信息：
 
-* `chunkNumber`: The index of the chunk in the current upload. First chunk is `1` (no base-0 counting here).
-* `totalChunks`: The total number of chunks.
-* `chunkSize`: The general chunk size. Using this value and `totalSize` you can calculate the total number of chunks. Please note that the size of the data received in the HTTP might be greater than `chunkSize` of this for the last chunk for a file.
-* `totalSize`: The total file size.
-* `identifier`: A unique identifier for the file contained in the request.
-* `filename`: The original file name (since a bug in Firefox results in the file name not being transmitted in chunk multipart posts).
-* `relativePath`: The file's relative path when selecting a directory (defaults to file name in all browsers except Chrome).
+* `chunkNumber`: 当前块的次序，第一个块是 1，注意不是从 0 开始的。
+* `totalChunks`: 文件被分成块的总数。
+* `chunkSize`: 分块大小，根据 `totalSize` 和这个值你就可以计算出总共的块数。注意最后一块的大小可能会比这个要大。
+* `currentChunkSize`: 当前块的大小，实际大小。
+* `totalSize`: 文件总大小。
+* `identifier`: 这个就是每个文件的唯一标示。
+* `filename`: 文件名。
+* `relativePath`: 文件夹上传的时候文件的相对路径属性。
 
-You should allow for the same chunk to be uploaded more than once; this isn't standard behaviour, but on an unstable network environment it could happen, and this case is exactly what Uploader.js is designed for.
+一个分块可以被上传多次，当然这肯定不是标准行为，但是在实际上传过程中是可能发生这种事情的，这种重传也是本库的特性之一。
 
-For every request, you can confirm reception in HTTP status codes (can be change through the `permanentErrors` option):
+对于每个请求的响应码你都可以根据 `successStatuses`和`permanentErrors` 配置项是否是认为成功或失败的：
 
-* `200`, `201`, `202`: The chunk was accepted and correct. No need to re-upload.
-* `404`, `415`. `500`, `501`: The file for which the chunk was uploaded is not supported, cancel the entire upload.
-* _Anything else_: Something went wrong, but try reuploading the file.
+* `200`, `201`, `202`: 当前块上传成功，不需要重传。
+* `404`, `415`. `500`, `501`: 当前块上传失败，会取消整个文件上传。
+* _其他状态码_: 出错了，但是会自动重试上传。
 
-## Handling GET (or `test()` requests)
+## 处理 GET (或者 `test()` 请求)
 
-Enabling the `testChunks` option will allow uploads to be resumed after browser restarts and even across browsers (in theory you could even run the same file upload across multiple tabs or different browsers).  The `POST` data requests listed are required to use Uploader.js to receive data, but you can extend support by implementing a corresponding `GET` request with the same parameters:
+如果说 `testChunks` 配置项是 `true` 的话，就可以实现秒传、或者刷新页面后、或者重启浏览器、甚至是跨浏览器还可以继续上传的效果，所有的上传必备的参数数据都会被一并发出：
 
-* If this request returns a `200`, `201` or `202` HTTP code, the chunks is assumed to have been completed.
-* If request returns a permanent error status, upload is stopped.
-* If request returns anything else, the chunk will be uploaded in the standard fashion.
+* 如果请求返回了 `successStatuses` 配置的状态码，那么假定此块已经上传成功了。
+* 如果返回的是 `permanentErrors` 中的状态码，那么就认为此块上传失败。
+* 如果是其他状态吗，那么就认为服务端还没有这个块，需要按照标准模式上传。
 
-After this is done and `testChunks` enabled, an upload can quickly catch up even after a browser restart by simply verifying already uploaded chunks that do not need to be uploaded again.
+所以有了以上的支持，服务端就可以根据预先发的这个请求来决定是否需要上传这个块内容，所以也就实现了秒传或者跨浏览器上传特性。
 
-## Full documentation
+## API 文档
 
 ### Uploader
 
-#### Configuration
+#### 配置
 
-The object is loaded with a configuration options:
+实例化的时候可以传入配置项：
+
 ```javascript
 var r = new Uploader({ opt1: 'val', ...})
 ```
-Available configuration options are:
 
-* `target` The target URL for the multipart POST request. This can be a string or a function. If a
-function, it will be passed a Uploader.File, a Uploader.Chunk and isTest boolean (Default: `/`)
-* `singleFile` Enable single file upload. Once one file is uploaded, second file will overtake existing one, first one will be canceled. (Default: false)
-* `chunkSize` The size in bytes of each uploaded chunk of data. The last uploaded chunk will be at least this size and up to two the size, see [Issue #51](https://github.com/23/resumable.js/issues/51) for details and reasons. (Default: `1*1024*1024`)
-* `forceChunkSize` Force all chunks to be less or equal than chunkSize. Otherwise, the last chunk will be greater than or equal to `chunkSize`. (Default: `false`)
-* `simultaneousUploads` Number of simultaneous uploads (Default: `3`)
-* `fileParameterName` The name of the multipart POST parameter to use for the file chunk  (Default: `file`)
-* `query` Extra parameters to include in the multipart POST with data. This can be an object or a
- function. If a function, it will be passed a Uploader.File, a Uploader.Chunk object and a isTest boolean
- (Default: `{}`)
-* `headers` Extra headers to include in the multipart POST with data. If a function, it will be passed a Uploader.File, a Uploader.Chunk object and a isTest boolean (Default: `{}`)
-* `withCredentials` Standard CORS requests do not send or set any cookies by default. In order to
- include cookies as part of the request, you need to set the `withCredentials` property to true.
-(Default: `false`)
-* `method` Method to use when POSTing chunks to the server (`multipart` or `octet`) (Default: `multipart`)
-* `testMethod` HTTP method to use when chunks are being tested. If set to a function, it will be passed a Uploader.File and a Uploader.Chunk arguments. (Default: `GET`)
-* `uploadMethod` HTTP method to use when chunks are being uploaded. If set to a function, it will be passed a Uploader.File arguments. (Default: `POST`)
-* `allowDuplicateUploads ` Once a file is uploaded, allow reupload of the same file. By default, if a file is already uploaded, it will be skipped unless the file is removed from the existing Uploader object. (Default: `false`)
-* `prioritizeFirstAndLastChunk` Prioritize first and last chunks of all files. This can be handy if you can determine if a file is valid for your service from only the first or last chunk. For example, photo or video meta data is usually located in the first part of a file, making it easy to test support from only the first chunk. (Default: `false`)
-* `testChunks` Make a GET request to the server for each chunks to see if it already exists. If implemented on the server-side, this will allow for upload resumes even after a browser crash or even a computer restart. (Default: `true`)
-* `preprocess` Optional function to process each chunk before testing & sending. To the function it will be passed the chunk as parameter, and should call the `preprocessFinished` method on the chunk when finished. (Default: `null`)
-* `initFileFn` Optional function to initialize the fileObject. To the function it will be passed a Uploader.File arguments.
-* `readFileFn` Optional function wrapping reading operation from the original file. To the function it will be passed the Uploader.File, the startByte and endByte, the fileType and the Uploader.Chunk. And should call the `readFinished` method with bytes arguments on the chunk when finished.
-* `checkChunkUploadedByResponse` Optional function to check chunk was uploaded by XHR response. To the function it will be passed the Uploader.Chunk and the response message. You do not need to upload(test) all chunks now, see [Issue #1](https://github.com/simple-uploader/Uploader/issues/1) for details and reasons, [sample](https://github.com/simple-uploader/Uploader/blob/develop/samples/Node.js/public/app.js#L15).
-* `generateUniqueIdentifier` Override the function that generates unique identifiers for each file. (Default: `null`)
-* `maxChunkRetries` The maximum number of retries for a chunk before the upload is failed. Valid values are any positive integer and `undefined` for no limit. (Default: `0`)
-* `chunkRetryInterval` The number of milliseconds to wait before retrying a chunk on a non-permanent error.  Valid values are any positive integer and `undefined` for immediate retry. (Default: `undefined`)
-* `progressCallbacksInterval` The time interval in milliseconds between progress reports. Set it
-to 0 to handle each progress callback. (Default: `500`)
-* `speedSmoothingFactor` Used for calculating average upload speed. Number from 1 to 0. Set to 1
-and average upload speed wil be equal to current upload speed. For longer file uploads it is
-better set this number to 0.02, because time remaining estimation will be more accurate. This
-parameter must be adjusted together with `progressCallbacksInterval` parameter. (Default 0.1)
-* `successStatuses` Response is success if response status is in this list (Default: `[200,201,
-202]`)
-* `permanentErrors` Response fails if response status is in this list (Default: `[404, 415, 500, 501]`)
-* `initialPaused` Initial paused state, default `false`.
-* `processResponse` Process xhr response, default `function (response, cb) { cb(null, response) }`. After 0.5.2, `processResponse` will be called with arguments: (response, cb, Uploader.File, Uploader.Chunk).
-* `processParams` Process xhr params, default `function (params) {return params}`. After 0.5.2, `processParams` will be called with arguments: (params, Uploader.File, Uploader.Chunk, isTest).
+支持的配置项：
 
-#### Properties
+* `target` 目标上传 URL，可以是字符串也可以是函数，如果是函数的话，则会传入 `Uploader.File` 实例、当前块 `Uploader.Chunk` 以及是否是测试模式，默认值为 `'/'`。
+* `singleFile` 单文件上传。覆盖式，如果选择了多个会把之前的取消掉。默认 `false`。
+* `chunkSize` 分块时按照该值来分。最后一个上传块的大小是可能是大于等于1倍的这个值但是小于两倍的这个值大小，可见这个 [Issue #51](https://github.com/23/resumable.js/issues/51)，默认 `1*1024*1024`。
+* `forceChunkSize` 是否强制所有的块都是小于等于 `chunkSize` 的值。默认是 `false`。
+* `simultaneousUploads` 并发上传数，默认 `3`。
+* `fileParameterName` 上传文件时文件的参数名，默认 `file`。
+* `query` 其他额外的参数，这个可以是一个对象或者是一个函数，如果是函数的话，则会传入 `Uploader.File` 实例、当前块 `Uploader.Chunk` 以及是否是测试模式，默认为 `{}`。
+* `headers` 额外的一些请求头，如果是函数的话，则会传入 `Uploader.File` 实例、当前块 `Uploader.Chunk` 以及是否是测试模式，默认 `{}`。
+* `withCredentials` 标准的 CORS 请求是不会带上 cookie 的，如果想要带的话需要设置 `withCredentials` 为 `true`，默认 `false`。
+* `method` 当上传的时候所使用的是方式，可选 `multipart`、`octet`，默认 `multipart`，参考 [multipart vs octet](https://stackoverflow.com/questions/29347234/multipart-form-data-vs-application-octet-stream)。
+* `testMethod` 测试的时候使用的 HTTP 方法，可以是字符串或者函数，如果是函数的话，则会传入 `Uploader.File` 实例、当前块 `Uploader.Chunk`，默认 `GET`。
+* `uploadMethod` 真正上传的时候使用的 HTTP 方法，可以是字符串或者函数，如果是函数的话，则会传入 `Uploader.File` 实例、当前块 `Uploader.Chunk`，默认 `POST`。
+* `allowDuplicateUploads ` 如果说一个文件已经上传过了是否还允许再次上传。默认的话如果已经上传了，除非你移除了否则是不会再次重新上传的，所以也就是默认值为 `false`。
+* `prioritizeFirstAndLastChunk` 对于文件而言是否高优先级发送第一个和最后一个块。一般用来发送到服务端，然后判断是否是合法文件；例如图片或者视频的 meta 数据一般放在文件第一部分，这样可以根据第一个块就能知道是否支持；默认 `false`。
+* `testChunks` 是否测试每个块是否在服务端已经上传了，主要用来实现秒传、跨浏览器上传等，默认 `true`。
+* `preprocess` 可选的函数，每个块在测试以及上传前会被调用，参数就是当前上传块实例 `Uploader.Chunk`，注意在这个函数中你需要调用当前上传块实例的 `preprocessFinished` 方法，默认 `null`。
+* `initFileFn` 可选函数用于初始化文件对象，传入的参数就是 `Uploader.File` 实例。
+* `readFileFn` 可选的函数用于原始文件的读取操作，传入的参数就是 `Uploader.File` 实例、文件类型、开始字节位置 startByte，结束字节位置 endByte、以及当前块 `Uploader.Chunk` 实例。并且当完成后应该调用当前块实例的`readFinished` 方法，且带参数-已读取的 bytes。
+* `checkChunkUploadedByResponse` 可选的函数用于根据 XHR 响应内容检测每个块是否上传成功了，传入的参数是：`Uploader.Chunk` 实例以及请求响应信息。这样就没必要上传（测试）所有的块了，具体细节原因参考 [Issue #1](https://github.com/simple-uploader/Uploader/issues/1)，[使用示例](https://github.com/simple-uploader/Uploader/blob/develop/samples/Node.js/public/app.js#L15).
+* `generateUniqueIdentifier` 可覆盖默认的生成文件唯一标示的函数，默认 `null`。
+* `maxChunkRetries` 最大自动失败重试上传次数，值可以是任意正整数，如果是 `undefined` 则代表无限次，默认 `0`。
+* `chunkRetryInterval` 重试间隔，值可以是任意正整数，如果是 `null` 则代表立即重试，默认 `null`。
+* `progressCallbacksInterval` 进度回调间隔，默认是 `500`。
+* `speedSmoothingFactor` 主要用于计算平均速度，值就是从 0 到 1，如果是 1 那么上传的平均速度就等于当前上传速度，如果说长时间上传的话，建议设置为 `0.02`，这样剩余时间预估会更精确，这个参数是需要和 `progressCallbacksInterval` 一起调整的，默认是 `0.1`。
+* `successStatuses` 认为响应式成功的响应码，默认 `[200, 201, 
+202]`。
+* `permanentErrors` 认为是出错的响应码，默认 `[404, 415, 500, 501]`。
+* `initialPaused` 初始文件 paused 状态，默认 `false`。
+* `processResponse` 处理请求结果，默认 `function (response, cb) { cb(null, response) }`。 0.5.2版本后，`processResponse` 会传入更多参数：(response, cb, Uploader.File, Uploader.Chunk)。
+* `processParams` 处理请求参数，默认 `function (params) {return params}`，一般用于修改参数名字或者删除参数。0.5.2版本后，`processParams` 会有更多参数：(params, Uploader.File, Uploader.Chunk, isTest)。
 
-* `.support` A boolean value indicator whether or not Uploader.js is supported by the current browser.
-* `.supportDirectory` A boolean value, which indicates if browser supports directory uploads.
-* `.opts` A hash object of the configuration of the Uploader.js instance.
-* `.files` An array of `Uploader.File` file objects added by the user (see full docs for this object type below).
-* `.fileList` An array of `Uploader.File` file(folder) objects added by the user (see full docs for this object type below), but it treated Folder as a `Uploader.File` Object.
+#### 属性
 
-#### Methods
+* `.support` 当前浏览器是否支持 File API 来上传。
+* `.supportDirectory` 当前浏览器是否支持文件夹上传。
+* `.opts` 实例的配置项对象。
+* `.files` 由 `Uploader.File` 文件对象组成的数组，纯文件列表。
+* `.fileList` 由 `Uploader.File` 文件、文件夹对象组成的数组，文件和文件夹共存。
 
-* `.assignBrowse(domNodes, isDirectory, singleFile, attributes)` Assign a browse action to one or more DOM nodes.
-  * `domNodes` array of dom nodes or a single node.
-  * `isDirectory` Pass in `true` to allow directories to be selected (Chrome only, support can be checked with `supportDirectory` property).
-  * `singleFile` To prevent multiple file uploads set this to true. Also look at config parameter `singleFile`.
-  * `attributes` Pass object of keys and values to set custom attributes on input fields.
-   For example, you can set `accept` attribute to `image/*`. This means that user will be able to select only images.
-   Full list of attributes: https://www.w3.org/wiki/HTML/Elements/input/file
+#### 方法
 
-   Note: avoid using `a` and `button` tags as file upload buttons, use span instead.
-* `.assignDrop(domNodes)` Assign one or more DOM nodes as a drop target.
-* `.unAssignDrop(domNodes)` Unassign one or more DOM nodes as a drop target.
-* `.on(event, callback)` Listen for event from Uploader.js (see below)
+* `.assignBrowse(domNodes, isDirectory, singleFile, attributes)` 指定 DOM 元素可以选择上传。
+  * `domNodes` DOM 元素
+  * `isDirectory` 如果传入的是 `true` 则代表是要选择文件夹上传的，你可以通过判断 `supportDirectory` 来决定是否设置
+  * `singleFile` 是否只能选择单个文件
+  * `attributes` 传入的其他属性值，例如你可以传入 `accept` 属性的值为 `image/*`，这样就意味着点选的时候只能选择图片。全部属性列表：https://www.w3.org/wiki/HTML/Elements/input/file
+
+  Note: 避免使用 `a` 或者 `button` 标签作为选择文件按钮。
+* `.assignDrop(domNodes)` 指定 DOM 元素作为拖拽上传目标。
+* `.unAssignDrop(domNodes)` 取消指定的 DOM 元素作为拖拽上传目标。
+* `.on(event, callback)` 监听事件。
 * `.off([event, [callback]])`:
-  * `.off(event)` Remove all callbacks of specific event.
-  * `.off(event, callback)` Remove specific callback of event. `callback` should be a `Function`.
-* `.upload()` Start or resume uploading.
-* `.pause()` Pause uploading.
-* `.resume()` Resume uploading.
-* `.cancel()` Cancel upload of all `Uploader.File` objects and remove them from the list.
-* `.progress()` Returns a float between 0 and 1 indicating the current upload progress of all files.
-* `.isUploading()` Returns a boolean indicating whether or not the instance is currently uploading anything.
-* `.addFile(file)` Add a HTML5 File object to the list of files.
-* `.removeFile(file)` Cancel upload of a specific `Uploader.File` object on the list from the list.
-* `.getFromUniqueIdentifier(uniqueIdentifier)` Look up a `Uploader.File` object by its unique identifier.
-* `.getSize()` Returns the total size of the upload in bytes.
-* `.sizeUploaded()` Returns the total size uploaded of all files in bytes.
-* `.timeRemaining()` Returns remaining time to upload all files in seconds. Accuracy is based on average speed. If speed is zero, time remaining will be equal to positive infinity `Number.POSITIVE_INFINITY`
+  * `.off(event)` 移除指定事件的所有事件回调
+  * `.off(event, callback)` 移除指定事件的指定回调。`callback` 是一个函数
+* `.upload()` 开始或者继续上传。
+* `.pause()` 暂停上传。
+* `.resume()` 继续上传。
+* `.cancel()` 取消所有上传文件，文件会被移除掉。
+* `.progress()` 返回一个0-1的浮点数，当前上传进度。
+* `.isUploading()` 返回一个布尔值标示是否还有文件正在上传中。
+* `.addFile(file)` 添加一个原生的文件对象到上传列表中。
+* `.removeFile(file)` 从上传列表中移除一个指定的 `Uploader.File` 实例对象。
+* `.getFromUniqueIdentifier(uniqueIdentifier)` 根据唯一标识找到 `Uploader.File` 实例。
+* `.getSize()` 上传文件的总大小。
+* `.sizeUploaded()` 所有已经成功上传文件大小。
+* `.timeRemaining()` 剩余时间，单位秒；这个是基于平均上传速度计算出来的，如果说上传速度为 0，那么这个值就是 `Number.POSITIVE_INFINITY`。
 
-#### Events
+#### 事件
 
-* `.change(event)` File input change event.
-* `.dragover(event)` Drop area dragover event.
-* `.dragenter(event)` Drop area dragenter event.
-* `.dragleave(event)` Drop area dragleave event.
-* `.fileSuccess(rootFile, file, message, chunk)` A specific file was completed. First argument `rootFile` is the root `Uploader.File` instance which contains or equal the completed file, second argument `file` argument is instance of `Uploader.File` too, it's the current completed file object, third argument `message` contains server response. Response is always a string. 
-Fourth argument `chunk` is instance of `Uploader.Chunk`. You can get response status by accessing xhr 
-object `chunk.xhr.status`.
-* `.fileComplete(rootFile)` A root file(Folder) was completed.
-* `.fileProgress(rootFile, file, chunk)` Uploading progressed for a specific file.
-* `.fileAdded(file, event)` This event is used for file validation. To reject this file return false.
-This event is also called before file is added to upload queue,
-this means that calling `uploader.upload()` function will not start current file upload.
-Optionally, you can use the browser `event` object from when the file was
-added.
-* `.filesAdded(files, fileList, event)` Same as fileAdded, but used for multiple file validation.
-* `.filesSubmitted(files, fileList, event)` Same as filesAdded, but happens after the file is added to upload queue. Can be used to start upload of currently added files.
-* `.fileRemoved(file)` The specific file was removed from the upload queue. Combined with filesSubmitted, can be used to notify UI to update its state to match the upload queue.
-* `.fileRetry(rootFile, file, chunk)` Something went wrong during upload of a specific file, uploading is being 
-retried.
-* `.fileError(rootFile, file, message, chunk)` An error occurred during upload of a specific file.
-* `.uploadStart()` Upload has been started.
-* `.complete()` Uploading completed.
-* `.catchAll(event, ...)` Listen to all the events listed above with the same callback function.
+* `.change(event)` input 的 change 事件。
+* `.dragover(event)` 拖拽区域的 dragover 事件。
+* `.dragenter(event)` 拖拽区域的 dragenter 事件。
+* `.dragleave(event)` 拖拽区域的 dragleave 事件。
+* `.fileSuccess(rootFile, file, message, chunk)` 一个文件上传成功事件，第一个参数 `rootFile` 就是成功上传的文件所属的根 `Uploader.File` 对象，它应该包含或者等于成功上传文件；第二个参数 `file` 就是当前成功的 `Uploader.File` 对象本身；第三个参数就是 `message` 就是服务端响应内容，永远都是字符串；第四个参数 `chunk` 就是 `Uploader.Chunk` 实例，它就是该文件的最后一个块实例，如果你想得到请求响应码的话，`chunk.xhr.status` 就是。
+* `.fileComplete(rootFile)` 一个根文件（文件夹）成功上传完成。
+* `.fileProgress(rootFile, file, chunk)` 一个文件在上传中。
+* `.fileAdded(file, event)` 这个事件一般用作文件校验，如果说返回了 `false`，那么这个文件就会被忽略，不会添加到文件上传列表中。
+* `.filesAdded(files, fileList, event)` 和 fileAdded 一样，但是一般用作多个文件的校验。
+* `.filesSubmitted(files, fileList, event)` 和 filesAdded 类似，但是是文件已经加入到上传列表中，一般用来开始整个的上传。
+* `.fileRemoved(file)` 一个文件（文件夹）被移除。
+* `.fileRetry(rootFile, file, chunk)` 文件重试上传事件。
+* `.fileError(rootFile, file, message, chunk)` 上传过程中出错了。
+* `.uploadStart()` 已经开始上传了。
+* `.complete()` 上传完毕。
+* `.catchAll(event, ...)` 所有的事件。
 
 ### Uploader.File
 
-#### Properties
+#### 属性
 
-* `.uploader` A back-reference to the parent `Uploader` object.
-* `.name` The name of the file(folder).
-* `.averageSpeed` Average upload speed, bytes per second.
-* `.currentSpeed` Current upload speed, bytes per second.
-* `.paused` Indicated if file(folder) is paused.
-* `.error` Indicated if file(folder) has encountered an error.
-* `.isFolder` Indicated if file(folder) is an `Directory`.
+* `.uploader` 对 `Uploader` 实例的引用。
+* `.name` 文件（夹）名字。
+* `.averageSpeed` 平均速度，单位字节每秒。
+* `.currentSpeed` 当前速度，单位字节每秒。
+* `.paused` 文件是否是暂停的。
+* `.error` 文件上传是否出错了。
+* `.isFolder` 是否是文件夹。
 
-If `.isFolder` is `false` then these properties will be added:
+如果不是文件夹的话，那么还会有如下属性：
 
-* `.file` The correlating HTML5 `File` object.
-* `.relativePath` The relative path to the file (defaults to file name if relative path doesn't exist).
-* `.size` Size in bytes of the file.
-* `.uniqueIdentifier` A unique identifier assigned to this file object. This value is included in uploads to the server for reference, but can also be used in CSS classes etc when building your upload UI.
-* `.chunks` An array of `Uploader.Chunk` items. You shouldn't need to dig into these.
+* `.file` 原生 HTML5 `File` 对象。
+* `.relativePath` 文件相对路径。
+* `.size` 文件大小，单位字节。
+* `.uniqueIdentifier` 文件唯一标示。
+* `.chunks` 由 `Uploader.Chunk` 实例组成数组，分成的块集合，一般场景下并不需要关心它。
 
-#### Methods
+#### 方法
 
-* `.getRoot()` Returns the file's root Uploader.File instance in `uploader.fileList`.
-* `.progress()` Returns a float between 0 and 1 indicating the current upload progress of the file.
-* `.pause()` Pause uploading the file.
-* `.resume()` Resume uploading the file.
-* `.cancel()` Abort uploading the file and delete it from the list of files to upload.
-* `.retry()` Retry uploading the file.
-* `.bootstrap()` Rebuild the state of a `Uploader.File` object, including reassigning chunks and XMLHttpRequest instances.
-* `.isUploading()` Returns a boolean indicating whether file chunks is uploading.
-* `.isComplete()` Returns a boolean indicating whether the file has completed uploading and received a server response.
-* `.sizeUploaded()` Returns size uploaded in bytes.
-* `.timeRemaining()` Returns remaining time to finish upload file in seconds. Accuracy is based on average speed. If speed is zero, time remaining will be equal to positive infinity `Number.POSITIVE_INFINITY`
-* `.getExtension()` Returns file extension in lowercase.
-* `.getType()` Returns file type.
+* `.getRoot()` 得到当前文件所属的根文件，这个根文件就是包含在 `uploader.fileList` 中的.
+* `.progress()` 返回一个 0 到 1 的数字，代表当前上传进度。
+* `.pause()` 暂停上传文件。
+* `.resume()` 继续上传文件。
+* `.cancel()` 取消上传且从文件列表中移除。
+* `.retry()` 重新上传文件。
+* `.bootstrap()` 重新初始化 `Uploader.File` 对象的状态，包括重新分块，重新创建新的 XMLHttpRequest 实例。
+* `.isUploading()` 文件是否仍在上传中。
+* `.isComplete()` 文件是否已经上传完成。
+* `.sizeUploaded()` 已经上传大小。
+* `.timeRemaining()` 剩余时间，基于平均速度的，如果说平均速度为 0，那么值就是 `Number.POSITIVE_INFINITY`。
+* `.getExtension()` 得到小写的后缀。
+* `.getType()` 得到文件类型。
 
-## Origin
+## 源
 
-Uploader.js was inspired by and evolved from https://github.com/flowjs/flow.js and https://github.com/23/resumable.js.
+simple-uploader-x.js 是 FORK 的 https://github.com/simple-uploader/Uploader

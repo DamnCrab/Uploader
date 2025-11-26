@@ -4,6 +4,7 @@ import { nodeResolve } from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
 import replace from '@rollup/plugin-replace';
 import terser from '@rollup/plugin-terser';
+import typescript from '@rollup/plugin-typescript';
 
 const name = 'uploader';
 const NAME = name.charAt(0).toUpperCase() + name.substr(1);
@@ -19,7 +20,7 @@ const banner = `/*!
 export default [
   // UMD build (unminified)
   {
-    input: 'src/uploader.js',
+    input: 'src/index.ts',
     output: {
       file: 'dist/uploader.js',
       format: 'umd',
@@ -31,17 +32,22 @@ export default [
         preventAssignment: true,
         '__VERSION__': pkg.version
       }),
+      typescript({
+        tsconfig: './tsconfig.json',
+        outputToFilesystem: true,
+      }),
       nodeResolve(),
       commonjs(),
       babel({
         babelHelpers: 'bundled',
+        extensions: ['.js', '.ts'],
         presets: [['@babel/preset-env', { targets: { ie: '10' } }]]
       })
     ]
   },
   // UMD build (minified)
   {
-    input: 'src/uploader.js',
+    input: 'src/index.ts',
     output: {
       file: 'dist/uploader.min.js',
       format: 'umd',
@@ -54,10 +60,15 @@ export default [
         preventAssignment: true,
         '__VERSION__': pkg.version
       }),
+      typescript({
+        tsconfig: './tsconfig.json',
+        outputToFilesystem: true,
+      }),
       nodeResolve(),
       commonjs(),
       babel({
         babelHelpers: 'bundled',
+        extensions: ['.js', '.ts'],
         presets: [['@babel/preset-env', { targets: { ie: '10' } }]]
       }),
       terser({
@@ -66,5 +77,27 @@ export default [
         }
       })
     ]
+  },
+  // ESM build
+  {
+    input: 'src/index.ts',
+    output: {
+      file: 'dist/uploader.esm.js',
+      format: 'esm',
+      banner
+    },
+    plugins: [
+      replace({
+        preventAssignment: true,
+        '__VERSION__': pkg.version
+      }),
+      typescript({
+        tsconfig: './tsconfig.json',
+        outputToFilesystem: true,
+      }),
+      nodeResolve(),
+      commonjs()
+    ]
   }
 ];
+

@@ -1,0 +1,43 @@
+export declare class Chunk {
+    uploader: any;
+    file: any;
+    bytes: Blob | null;
+    offset: number;
+    tested: boolean;
+    retries: number;
+    pendingRetry: boolean;
+    preprocessState: number;
+    readState: number;
+    loaded: number;
+    total: number;
+    chunkSize: number;
+    startByte: number;
+    endByte: number;
+    xhr: XMLHttpRequest | null;
+    static STATUS: {
+        PENDING: string;
+        UPLOADING: string;
+        READING: string;
+        SUCCESS: string;
+        ERROR: string;
+        COMPLETE: string;
+        PROGRESS: string;
+        RETRY: string;
+    };
+    constructor(uploader: any, file: any, offset: number);
+    _event(evt: string, ...args: any[]): void;
+    computeEndByte(): number;
+    getParams(): Record<string, any>;
+    getTarget(target: string, params: string[]): string;
+    test(): void;
+    preprocessFinished(): void;
+    readFinished(bytes: Blob): void;
+    send(): void;
+    prepareXhrRequest(method: string, isTest: boolean, optMethod?: string, blob?: Blob | null): FormData | null;
+    abort(): void;
+    status(isTest?: boolean): string;
+    message(): string;
+    doneHandler(event: Event): void;
+    processResponseDone(err: Error | null, response: any, status: string): void;
+}
+export default Chunk;
